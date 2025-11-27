@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: sever-nodejs-bot
+    env: node
+    buildCommand: "npm install"
+    startCommand: "node index.js"
+    plan: starter
+    envVars:
+      - key: WEBSOCKET_ENABLED
+        value: "true"
