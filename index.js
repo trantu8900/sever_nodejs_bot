@@ -20,26 +20,29 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const WS_PATH = process.env.WS_PATH || "/ws";
 
 const server = app.listen(PORT, () =>
   console.log(`✔ HTTP server ON http://localhost:${PORT}`)
 );
 
-const wss = new WebSocketServer({ server, path: WS_PATH });
+// ❗ FIX 1: Remove PATH – Render does NOT support WebSocket path
+const wss = new WebSocketServer({ server });
 
-console.log(`✔ WebSocket ON ws://localhost:${PORT}${WS_PATH}`);
+console.log(`✔ WebSocket ON ws://localhost:${PORT}`);
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_KEY });
 
 wss.on("connection", (ws) => {
   console.log("🔗 Client connected");
 
+  ws.send(JSON.stringify({ type: "system", message: "connected" }));
+
   ws.on("message", async (raw) => {
     try {
       const msg = raw.toString();
       console.log("📩 Received:", msg);
 
+      // ❗ FIX 2: Wrap message in JSON to avoid "Hello" being misinterpreted
       const stream = await client.chat.completions.create({
         model: "gpt-4o-mini",
         stream: true,
@@ -49,15 +52,15 @@ wss.on("connection", (ws) => {
       for await (const chunk of stream) {
         const token = chunk.choices?.[0]?.delta?.content || "";
         if (token) {
-          ws.send(token); // realtime
+          ws.send(JSON.stringify({ type: "token", data: token }));
         }
       }
 
-      ws.send("[END]");
+      ws.send(JSON.stringify({ type: "end" }));
 
     } catch (err) {
       console.error("❌ OpenAI ERROR:", err);
-      ws.send("[ERROR] " + err.message);
+      ws.send(JSON.stringify({ type: "error", message: err.message }));
     }
   });
 
